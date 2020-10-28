@@ -26,7 +26,7 @@ import java.sql.ResultSet
 import java.sql.Statement
 import java.sql.SQLException
 import java.util.regex.Pattern
-import ariba.sm.api.db.DataSourceConfig
+import ariba.sm.api.sensitive.core.db.DataSourceConfig
 
 
 DataSource dataSource = getDataSource(false);

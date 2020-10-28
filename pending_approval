@@ -1,0 +1,131 @@
+import ariba.sm.util.PropertiesUtil
+import org.springframework.boot.autoconfigure.jdbc.DataSourceBuilder
+
+import javax.sql.DataSource
+import java.sql.Connection
+import java.sql.ResultSet
+import java.sql.Statement
+import java.sql.SQLException
+import java.util.regex.Pattern
+import ariba.sm.api.db.DataSourceConfig
+
+
+DataSource dataSource = getDataSource(false);
+StringBuilder logMessage = new StringBuilder();
+Connection conn = null;
+int tenantId = 1266; // SURA
+
+String smVendor_id_list="('S12295252')";
+
+String selectRegistrationQuery="SELECT SM_VENDOR_ID, REGISTRATION_STATUS " +
+        " FROM VENDOR " +
+        " WHERE " +
+        " SM_VENDOR_ID IN " + smVendor_id_list +
+        " AND TENANT_ID=" + tenantId;
+
+String updateRegistrationQuery="UPDATE VENDOR SET REGISTRATION_STATUS='PendingApproval' " +
+        " WHERE " +
+        " SM_VENDOR_ID IN " + smVendor_id_list +
+        " AND TENANT_ID=" + tenantId;
+
+try {
+    conn = dataSource.getConnection();
+
+    Statement stmt = conn.createStatement();
+    ResultSet rs = null;
+
+    /////////////////////////////////////////////////////////////////////////////////////////////
+    // Select Query
+    /////////////////////////////////////////////////////////////////////////////////////////////
+    logMessage.append("----- BEFORE UPDATE in REGISTRATION TABLE -----\n");
+    rs = stmt.executeQuery(selectRegistrationQuery);
+    while (rs.next()) {
+        for (int i = 1; i <= 2; i++) {
+            logMessage.append(rs.getString(i)).append(';\t');
+        }
+        logMessage.append("\n");
+    }
+    rs.close();
+    /////////////////////////////////////////////////////////////////////////////////////////////
+
+    // Update Query
+    /////////////////////////////////////////////////////////////////////////////////////////////
+    logMessage.append("----- UPDATING -----\n");
+    int result = stmt.executeUpdate(updateRegistrationQuery);
+    logMessage.append("Updated Results for :"+result+" rows\n");
+    /////////////////////////////////////////////////////////////////////////////////////////////
+
+    // Select Query
+    /////////////////////////////////////////////////////////////////////////////////////////////
+    logMessage.append("----- AFTER UPDATE in REGISTRATION TABLE -----\n")
+    rs = stmt.executeQuery(selectRegistrationQuery);
+    while (rs.next()) {
+        for (int i = 1; i <= 2; i++) {
+            logMessage.append(rs.getString(i)).append(';\t')
+        }
+        logMessage.append("\n")
+    }
+    rs.close();
+    /////////////////////////////////////////////////////////////////////////////////////////////
+
+} catch (Exception sqlException) {
+    String lineNum = extractLineNum(sqlException);
+    String msg = "**************************** at: " + lineNum + " Stacktrace=" + sqlException.stackTrace;
+    System.out.println(msg);
+    logMessage.append(msg);
+} finally {
+    try {
+        if (conn != null) conn.close();
+    } catch (SQLException sqlException) {
+        String lineNum = extractLineNum(sqlException);
+        String msg = "**************************** at: " + lineNum + " Stacktrace=" + sqlException.stackTrace;
+        System.out.println(msg);
+        logMessage.append(msg);
+    }
+}
+
+logMessage.append("SCRIPT EXECUTION COMPLETED\n").append(new Date());
+logMessage.toString();
+
+private DataSource getDataSource(boolean sys)
+{
+    String dbType = sys ? "hanasmsys" : "hanasuppliermanagement";
+    String serverId =
+            PropertiesUtil.stringValueForKey("DBConnections." + dbType + ".serverId");
+
+    String dbNamePropertyQualifier = "";
+
+    String username = PropertiesUtil.stringValueForKey("DBConnections." + dbType + ".username");
+    String password = PropertiesUtil.stringValueForKey("DBConnections." + dbType + ".password");
+    String port = PropertiesUtil.stringValueForKey("DBConnections." + dbType + "" + dbNamePropertyQualifier + ".port")
+    String hostName =  PropertiesUtil.stringValueForKey("DBConnections." + dbType + "" + dbNamePropertyQualifier + ".hostname")
+
+    String connStr = DataSourceConfig.buildConnectionString(hostName, port, serverId, false);
+
+    DataSourceBuilder factory = DataSourceBuilder
+            .create(this.getClass().getClassLoader())
+            .driverClassName(PropertiesUtil.stringValueForKey("DBConnections.driver"))
+            .username(username)
+            .password(password)
+            .url(connStr);
+
+    DataSource dataSource = factory.build();
+
+    return dataSource;
+}
+
+private String extractLineNum(Exception exception)
+{
+    if (exception == null || exception.getStackTrace() == null)
+        return null;
+
+    String s = exception.getStackTrace();
+    String regex = ".*?Script1.groovy:([0-9]*)\\).*?";
+    Pattern pattern = Pattern.compile(regex);
+    def matcher = pattern.matcher(s);
+    if (matcher.find() && matcher.hasGroup()) {
+        String g = matcher.group()
+        return g;
+    }
+    return null;
+}
